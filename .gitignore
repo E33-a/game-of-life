@@ -1,0 +1,45 @@
+# C++ compiled binaries
+game
+src/cpp/game
+*.o
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# LaTeX auxiliary files
+*.aux
+*.bbl
+*.blg
+*.brf
+*.bcf
+*.cb
+*.cb2
+*.fdb_latexmk
+*.fls
+*.fmt
+*.fot
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.pdf
+*.snm
+*.synctex.gz
+*.toc
+*.run.xml
+
+# VS Code
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db

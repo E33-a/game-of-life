@@ -1,0 +1,141 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\title{\Huge Documentación Técnica Avanzada y Análisis a Nivel de Código:\\ \Large Conway's Game of Life}
+\author{Motor Lógico C++ e Interfaz Gráfica Python}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introducción}
+Este documento técnico desglosa la totalidad de la arquitectura de la aplicación ``Conway's Game of Life''. Se detalla sistemáticamente el modelo matemático implementado, la validación de memoria, la estructura de datos para almacenamiento de estados espaciotemporales y el acoplamiento con la Interfaz Gráfica de Usuario (GUI) desarrollada bajo el framework \texttt{Tkinter}.
+
+La aplicación se apoya en una dualidad estructural: un núcleo originado en C++ para operaciones sobre terminal y un frontend completo basado en Python para despliegue multiplataforma interactivo.
+
+\section{Formalización Matemática del Autómata}
+El Juego de la Vida de Conway es un autómata celular no determinista condicionado únicamente por su estado inicial $T_0$.
+
+Para una matriz de orden $M \times N$, definimos el estado de una célula en la coordenada $(i, j)$ en el tiempo $t$ como $C^{(t)}_{i,j} \in \{0, 1\}$.
+El vecindario de Moore $V_{i,j}$ contiene un máximo de 8 células adyacentes. La suma de células vivas vecinas se denota como:
+\begin{equation}
+S^{(t)}_{i,j} = \sum_{x=\max(0, i-1)}^{\min(M-1, i+1)} \sum_{y=\max(0, j-1)}^{\min(N-1, j+1)} C^{(t)}_{x,y} \quad - C^{(t)}_{i,j}
+\end{equation}
+
+La función de transición de estado hacia $t+1$ sigue la lógica condicional escalonada:
+\begin{equation}
+C^{(t+1)}_{i,j} = 
+\begin{cases} 
+1 & \text{si } C^{(t)}_{i,j} = 1 \text{ y } S^{(t)}_{i,j} \in \{2, 3\} \\
+1 & \text{si } C^{(t)}_{i,j} = 0 \text{ y } S^{(t)}_{i,j} = 3 \\
+0 & \text{en cualquier otro caso}
+\end{cases}
+\end{equation}
+
+\section{Análisis de Código Profundo: Motor C++}
+El código C++ comprende múltiples cabeceras especializadas y un punto de entrada.
+
+\subsection{\texttt{main.cpp} y \texttt{GameValidator.h}}
+El archivo \texttt{main.cpp} es el orquestador principal. Tras limpiar la pantalla con la función multiplataforma \texttt{clearScreen()}, inicializa el validador:
+\begin{itemize}
+    \item \textbf{Clase \texttt{GameValidator}}: Tiene la responsabilidad exclusiva de proteger al programa de errores de entrada por el usuario (\textit{Input Sanitization}). Procesa la lectura del tamaño matricial y verifica que la entrada no cause colisiones (por ejemplo, previniendo valores no enteros o negativos mediante los \textit{flags} de estado del flujo de \texttt{std::cin}). 
+\end{itemize}
+Tras la validación, transfiere las variables \texttt{rows} y \texttt{columns} a las estructuras persistentes (Singletons).
+
+\subsection{\texttt{Utilities.h} y Singleton \texttt{QueueBoardChanges}}
+\begin{itemize}
+    \item \textbf{Patrón Singleton}: Se implementa restringiendo el constructor al ámbito privado y cancelando el constructor de copia (\texttt{QueueBoardChanges(const QueueBoardChanges\&) = delete}). El acceso global se otorga exclusivamente mediante el método estático \texttt{getInstance()}.
+    \item \textbf{\texttt{changesInBoard}}: Instancia de \texttt{std::queue\textless std::vector\textless std::vector\textless int\textgreater\textgreater\textgreater}. Esta cola estricta almacena la totalidad de los cambios evolutivos del tablero.
+    \item \textbf{\texttt{printBlocksOfFour()}}: Paginador inteligente. Imprime lotes de estados paralelos. Evita el uso incontrolado de \texttt{std::cout} utilizando una copia transitoria de la cola, extrayendo elementos hasta llenar un \texttt{vector} de bloques.
+\end{itemize}
+
+\subsection{\texttt{GameBoard.h}: Núcleo de Computación}
+Contiene la representación primaria en memoria.
+\begin{itemize}
+    \item \textbf{\texttt{generateGridAndFill()}}: Asigna el tamaño a los vectores $T$ (\texttt{grid}) y $T+1$ (\texttt{nextGeneration}) empleando \texttt{vector::assign()}. Genera la siembra aleatoria mediante la semilla temporal \texttt{srand(time(0))}.
+    \item \textbf{\texttt{applyGameOfLifeRules()}}: El método más intensivo del código. Ejecuta un bucle $O(M \times N \times 8)$. Interroga a \texttt{countLiveNeighbors} y aplica la lógica matemática descrita en la ecuación 2. Actualiza los punteros e invoca \texttt{boardChanges.addCurrentBoard(grid)} para generar persistencia histórica en la cola.
+\end{itemize}
+
+\subsection{\texttt{GameSimulator.h}: Bucle Principal}
+Estructura controladora.
+\begin{itemize}
+    \item \textbf{\texttt{startSimulation()}}: Un ciclo \texttt{do-while} inyecta los pasos evolutivos del juego. Detiene automáticamente la ejecución anticipada utilizando el método optimizado \texttt{board.hasLiveCells()} para evitar gasto innecesario de CPU si la entropía de la matriz llega a cero (sistema muerto o en bucle infinito).
+\end{itemize}
+
+\newpage
+\section{Análisis de Interfaz y Gráficos: Python \& Tkinter}
+La traducción del motor hacia un paradigma visual en Python respeta la lógica C++ originaria pero aplica abstracciones y paradigmas reactivos orientados a eventos (Event-Driven).
+
+\subsection{Clase Estructural \texttt{GameBoard}}
+Es el equivalente en Python a \texttt{GameBoard.h} y \texttt{QueueBoardChanges}.
+\begin{itemize}
+    \item \textbf{\texttt{self.history = deque()}}: A diferencia de las listas tradicionales de Python que penalizan reubicaciones con orden de complejidad $O(n)$, \texttt{collections.deque} ofrece un arreglo de doble entrada (Double Ended Queue) de $O(1)$. 
+    \item \textbf{\texttt{save\_state(self)}}: Un problema recurrente en Python son las fugas de \textit{pointers} de memoria. Si se adjunta \texttt{self.grid} directo a \texttt{history}, todos los registros mutarán si el original muta. La solución es una iteración a nivel de listas: \texttt{[row[:] for row in self.grid]}, asegurando una separación real de bloques de memoria.
+    \item \textbf{\texttt{next\_generation(self)}}: Calcula $T+1$. Para aislar los saltos cuánticos intergeneracionales, opera sobre un clon efímero \texttt{new\_grid}. Así se garantiza que la matriz de base no sea alterada de forma asimétrica durante el cálculo parcial de los vecinos en la misma fase de barrido.
+\end{itemize}
+
+\subsection{Clase Visual \texttt{TechDialog}}
+Sustituye por completo al \texttt{tkinter.simpledialog}.
+\begin{itemize}
+    \item \textbf{Naturaleza Modal Desacoplada}: Este \texttt{Toplevel} personalizado prescinde forzosamente de los inyectores \texttt{transient()} (que emparejan la ventana hija sobre la raíz) y \texttt{grab\_set()} (que secuestran de modo monopoólico los clics del OS). Dado que \texttt{root.withdraw()} vuelve inalcanzable al contenedor base, forzar focus en Linux/X11 genera una suspensión crítica de la interfaz. Su retiro permite recolección de datos limpia.
+    \item \textbf{\texttt{self.update\_idletasks()}}: Sincroniza al \textit{Mainloop} para calcular correctamente \texttt{winfo\_reqwidth()} y \texttt{winfo\_reqheight()}, y permitir centrar la ventana dinámicamente usando división entera sobre la geometría \texttt{winfo\_screenwidth()}.
+\end{itemize}
+
+\subsection{Clase \texttt{GameOfLifeApp}}
+\begin{itemize}
+    \item \textbf{\texttt{draw\_board(self)}}: Re-renderizador del canvas. Elimina primero todos los rectángulos previos con \texttt{self.canvas.delete("all")}. Mapea cada célula $C_{i,j}$ al espacio bidimensional geométrico interpolando con \texttt{self.cell\_size}. Pinta \texttt{\#00ffcc} si el valor es 1 y \texttt{\#0d1117} si es 0, respetando un contorno divisorio \texttt{\#30363d}.
+    \item \textbf{\texttt{toggle\_cell(self, event)}}: Callback asíncrono activado por \texttt{\textless Button-1\textgreater} (Clic izquierdo). El objeto \texttt{event} retorna posiciones en pixeles absolutos ($event.x$, $event.y$). Mediante una simple división por suelo (\texttt{// self.cell\_size}) se deduce el índice de celda en la matriz lógica, posibilitando al usuario reescribir variables en tiempo de ejecución.
+    \item \textbf{\texttt{auto\_play(self)}}: Emplea inyección de \textit{eventos temporizados}. Al contrario de la detención nativa inducida por \texttt{time.sleep()} (que congela a la GUI), hace uso de \texttt{self.root.after(300, callback)}. Esta táctica deja respirar al Mainloop de \texttt{Tkinter} entre ciclos para registrar pulsaciones de detención o dibujados, sin paralizar la aplicación.
+    \item \textbf{\texttt{clear\_board(self)} / \texttt{restart\_board(self)}}: Métodos para inyectar orden en estado de caos. Apagan proactivamente el motor en caso de que esté activado el \texttt{Auto Play} y vacían o re-semillan los arreglos multidimensionales antes de disparar un \texttt{draw\_board} en forzado local.
+\end{itemize}
+
+\section{Transparencia de Soporte (Multiplataforma)}
+El enfoque de desarrollo priorizó la arquitectura "Escribir una vez, ejecutar en cualquier lugar" (\textit{Write Once, Run Anywhere}):
+\begin{enumerate}
+    \item \textbf{C++ en Windows}: El uso de directivas como \texttt{\#ifdef \_WIN32} compila bloques de comando para MSDOS (\texttt{system("cls")}) en compiladores locales, manteniendo la portabilidad en compilaciones GNU (gcc/g++) para las llamadas a \texttt{clear}.
+    \item \textbf{Python Native GUI}: \texttt{Tkinter} recubre un motor integrado Tcl/Tk compilado directamente en binarios universales por el Python Software Foundation. Todas las configuraciones hexadécimales de colores o geometrías son resueltas en C de bajo nivel de forma autónoma sin depender de API nativa tipo Win32 o librerías GTK externas en distribuciones de Linux.
+\end{enumerate}
+
+\end{document}
