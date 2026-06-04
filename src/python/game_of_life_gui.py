@@ -106,15 +106,13 @@ class TechDialog(tk.Toplevel):
 class GameOfLifeApp:
     def __init__(self, root):
         self.root = root
-        self.root.withdraw() # Ocultar la ventana principal temporalmente
+        self.root.withdraw() 
         self.root.title("Conway's Game of Life - Tech Edition")
         self.root.configure(bg="#0d1117")
         
-        # Pedir dimensiones
         dialog_rows = TechDialog(self.root, "Setup", "> NÚMERO DE FILAS _", 20)
         self.rows = dialog_rows.result
         
-        # Destruir si se cierra
         if not self.root.winfo_exists():
             return
 
@@ -124,8 +122,8 @@ class GameOfLifeApp:
         if not self.root.winfo_exists():
             return
 
-        self.root.deiconify() # Mostrar ventana principal
-        self.root.minsize(600, 400) # Tamaño mínimo de la ventana
+        self.root.deiconify()
+        self.root.minsize(600, 400)
 
         self.cell_size = 20
         self.board = GameBoard(self.rows, self.cols)
@@ -135,7 +133,6 @@ class GameOfLifeApp:
         self.draw_board()
 
     def setup_ui(self):
-        # Frame superior para botones
         control_frame = tk.Frame(self.root, bg="#0d1117")
         control_frame.pack(pady=10)
 
@@ -161,25 +158,21 @@ class GameOfLifeApp:
         self.btn_restart = tk.Button(control_frame, text="Reiniciar", command=self.restart_board, **btn_style)
         self.btn_restart.pack(side=tk.LEFT, padx=5)
 
-        # Etiqueta de estado (empaquetada antes del canvas para que no se oculte al achicar la ventana)
         self.lbl_status = tk.Label(self.root, text="> GENERACIÓN: 1 _", bg="#0d1117", fg="#00ffcc", font=("Consolas", 12, "bold"))
         self.lbl_status.pack(side=tk.BOTTOM, pady=5)
 
-        # Canvas para dibujar la cuadrícula
         canvas_width = self.cols * self.cell_size
         canvas_height = self.rows * self.cell_size
         self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height, 
                                 bg="#0d1117", borderwidth=0, highlightthickness=2, highlightbackground="#30363d")
         self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # Permitir cambiar el estado de las celdas haciendo clic en ellas
         self.canvas.bind("<Button-1>", self.toggle_cell)
         self.canvas.bind("<Configure>", self.on_resize)
 
     def draw_board(self):
         self.canvas.delete("all")
         
-        # Calcular offsets para centrar el tablero
         board_width = self.cols * self.cell_size
         board_height = self.rows * self.cell_size
         canvas_width = max(0, self.canvas.winfo_width() - 4)
@@ -195,7 +188,6 @@ class GameOfLifeApp:
                 x2 = x1 + self.cell_size
                 y2 = y1 + self.cell_size
                 
-                # Neon color for alive, dark background for dead
                 color = "#00ffcc" if self.board.grid[i][j] == 1 else "#0d1117"
                 outline_color = "#30363d"
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline_color)
@@ -203,7 +195,6 @@ class GameOfLifeApp:
         self.lbl_status.config(text=f"> GENERACIÓN: {len(self.board.history)} _")
 
     def toggle_cell(self, event):
-        # Calculate grid coordinates from click with offsets
         col = (event.x - getattr(self, 'offset_x', 0)) // self.cell_size
         row = (event.y - getattr(self, 'offset_y', 0)) // self.cell_size
         
@@ -255,14 +246,13 @@ class GameOfLifeApp:
     def auto_play(self):
         if self.is_playing:
             self.next_step()
-            if self.is_playing:  # Verificar si se detuvieron
-                self.root.after(50, self.auto_play) # 50 ms de delay
+            if self.is_playing:
+                self.root.after(50, self.auto_play)
 
     def print_history(self):
         print(f"\nMostrando un total de {len(self.board.history)} cambios de generación\n")
         history_copy = list(self.board.history)
         
-        # Imprime los tableros en bloques (ej. de 4 en 4)
         for idx, state in enumerate(history_copy):
             print(f"--- Generación {idx + 1} ---")
             for row in state:
