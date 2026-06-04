@@ -123,6 +123,7 @@ class GameOfLifeApp:
             return
 
         self.root.deiconify() # Mostrar ventana principal
+        self.root.minsize(600, 400) # Tamaño mínimo de la ventana
 
         self.cell_size = 20
         self.board = GameBoard(self.rows, self.cols)
@@ -158,26 +159,37 @@ class GameOfLifeApp:
         self.btn_restart = tk.Button(control_frame, text="Reiniciar", command=self.restart_board, **btn_style)
         self.btn_restart.pack(side=tk.LEFT, padx=5)
 
+        # Etiqueta de estado (empaquetada antes del canvas para que no se oculte al achicar la ventana)
+        self.lbl_status = tk.Label(self.root, text="> GENERACIÓN: 1 _", bg="#0d1117", fg="#00ffcc", font=("Consolas", 12, "bold"))
+        self.lbl_status.pack(side=tk.BOTTOM, pady=5)
+
         # Canvas para dibujar la cuadrícula
         canvas_width = self.cols * self.cell_size
         canvas_height = self.rows * self.cell_size
         self.canvas = tk.Canvas(self.root, width=canvas_width, height=canvas_height, 
                                 bg="#0d1117", borderwidth=0, highlightthickness=2, highlightbackground="#30363d")
-        self.canvas.pack(padx=20, pady=10)
+        self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # Permitir cambiar el estado de las celdas haciendo clic en ellas
         self.canvas.bind("<Button-1>", self.toggle_cell)
-
-        # Etiqueta de estado
-        self.lbl_status = tk.Label(self.root, text="> GENERACIÓN: 1 _", bg="#0d1117", fg="#00ffcc", font=("Consolas", 12, "bold"))
-        self.lbl_status.pack(pady=5)
+        self.canvas.bind("<Configure>", self.on_resize)
 
     def draw_board(self):
         self.canvas.delete("all")
+        
+        # Calcular offsets para centrar el tablero
+        board_width = self.cols * self.cell_size
+        board_height = self.rows * self.cell_size
+        canvas_width = max(0, self.canvas.winfo_width() - 4)
+        canvas_height = max(0, self.canvas.winfo_height() - 4)
+        
+        self.offset_x = max(0, (canvas_width - board_width) // 2)
+        self.offset_y = max(0, (canvas_height - board_height) // 2)
+        
         for i in range(self.rows):
             for j in range(self.cols):
-                x1 = j * self.cell_size
-                y1 = i * self.cell_size
+                x1 = self.offset_x + j * self.cell_size
+                y1 = self.offset_y + i * self.cell_size
                 x2 = x1 + self.cell_size
                 y2 = y1 + self.cell_size
                 
@@ -189,13 +201,24 @@ class GameOfLifeApp:
         self.lbl_status.config(text=f"> GENERACIÓN: {len(self.board.history)} _")
 
     def toggle_cell(self, event):
-        # Calculate grid coordinates from click
-        col = event.x // self.cell_size
-        row = event.y // self.cell_size
+        # Calculate grid coordinates from click with offsets
+        col = (event.x - getattr(self, 'offset_x', 0)) // self.cell_size
+        row = (event.y - getattr(self, 'offset_y', 0)) // self.cell_size
         
         if 0 <= row < self.rows and 0 <= col < self.cols:
             self.board.grid[row][col] = 1 - self.board.grid[row][col]
             self.draw_board()
+
+    def on_resize(self, event):
+        available_width = event.width - 4
+        available_height = event.height - 4
+        if available_width > 0 and available_height > 0:
+            cell_w = available_width // self.cols
+            cell_h = available_height // self.rows
+            new_size = max(1, min(cell_w, cell_h))
+            if new_size != self.cell_size:
+                self.cell_size = new_size
+                self.draw_board()
 
     def clear_board(self):
         if self.is_playing:
