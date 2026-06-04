@@ -95,11 +95,11 @@ class TechDialog(tk.Toplevel):
     def on_ok(self):
         try:
             val = int(self.entry.get())
-            if val >= 5:
+            if 5 <= val <= 100:
                 self.result = val
                 self.destroy()
             else:
-                messagebox.showwarning("Entrada Inválida", "El valor debe ser un número entero mayor o igual a 5.")
+                messagebox.showwarning("Entrada Inválida", "El valor debe estar entre 5 y 100.")
         except ValueError:
             messagebox.showwarning("Entrada Inválida", "Por favor ingresa un número entero válido.")
 
